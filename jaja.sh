@@ -1,8 +1,7 @@
 #!/bin/bash
+# Hola
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🎨 COLORES
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Colores para mejor visualización
 GREEN="\033[1;32m"
 RED="\033[1;31m"
 YELLOW="\033[1;33m"
@@ -10,56 +9,147 @@ BLUE="\033[1;34m"
 CYAN="\033[1;36m"
 RESET="\033[0m"
 
-SEPARADOR="${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+# Separador reutilizable
+SEPARADOR="${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📍 RUTA DE INSTALACIÓN
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INSTALL_PATH="$HOME/bin"
-SCRIPT_NAME="manager-ssh"
-SCRIPT_URL="https://raw.githubusercontent.com/ChristopherAGT/sshws-gcp-config/main/ssh-manager.sh"
+# Archivos temporales a eliminar
+TEMP_FILES=("build-service-ssh.sh" "edit-service-ssh.sh" "remove-service-ssh.sh")
 
-echo -e "$SEPARADOR"
-echo -e "${YELLOW}📦 Instalador del panel SSH-WS${RESET}"
-echo -e "${BLUE}🔗 URL del script:${RESET} $SCRIPT_URL"
-echo -e "$SEPARADOR"
+# Eliminar archivos temporales al salir o al interrumpir con Ctrl+C
+trap 'rm -f "${TEMP_FILES[@]}"' EXIT
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📁 Crear carpeta bin si no existe
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo -e "${CYAN}📂 Verificando directorio ${INSTALL_PATH}...${RESET}"
-mkdir -p "$INSTALL_PATH"
+# Función para pausar antes de volver al menú
+pausa_menu() {
+    echo
+    echo -e "${BLUE}🔁 Presione cualquier tecla para volver al menú...${RESET}"
+    read -n 1 -s
+    echo
+}
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ⬇️ Descargar el script
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo -e "${CYAN}⬇️ Descargando script...${RESET}"
-curl -fsSL "$SCRIPT_URL" -o "$INSTALL_PATH/$SCRIPT_NAME"
-if [[ $? -ne 0 || ! -s "$INSTALL_PATH/$SCRIPT_NAME" ]]; then
-    echo -e "${RED}❌ Error al descargar el script desde:${RESET} $SCRIPT_URL"
+# Función para eliminar archivo si existe y descargar uno nuevo
+descargar_limpio() {
+    local url=$1
+    local archivo=$2
+
+    if [[ -f $archivo ]]; then
+        rm -f "$archivo"
+    fi
+
+    wget -q "$url" -O "$archivo"
+    if [[ $? -ne 0 || ! -s $archivo ]]; then
+        echo -e "${RED}❌ Error al descargar el archivo '${archivo}'.${RESET}"
+        return 1
+    fi
+    return 0
+}
+
+function construir_servicio() {
     echo -e "$SEPARADOR"
-    exit 1
-fi
+    echo -e "${YELLOW}⚙️ Construyendo un nuevo servicio...${RESET}"
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ✅ Dar permisos de ejecución
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-chmod +x "$INSTALL_PATH/$SCRIPT_NAME"
-echo -e "${GREEN}✅ Permisos de ejecución otorgados.${RESET}"
+    descargar_limpio "https://raw.githubusercontent.com/ChristopherAGT/sshws-gcp-config/main/build-service-ssh.sh" "build-service-ssh.sh"
+    if [[ $? -ne 0 ]]; then
+        pausa_menu
+        return 1
+    fi
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🔧 Agregar al PATH si es necesario
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-if [[ ":$PATH:" != *":$INSTALL_PATH:"* ]]; then
-    echo -e "${YELLOW}➕ Agregando $INSTALL_PATH al PATH en .bashrc...${RESET}"
-    echo "export PATH=\"\$HOME/bin:\$PATH\"" >> "$HOME/.bashrc"
-    source "$HOME/.bashrc"
-fi
+    bash build-service-ssh.sh
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}❌ Error al ejecutar el script de construcción.${RESET}"
+        pausa_menu
+        return 1
+    fi
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🎉 Mensaje final
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo -e "$SEPARADOR"
-echo -e "${GREEN}✅ Instalación completada correctamente.${RESET}"
-echo -e "${BLUE}🚀 Puedes iniciar el panel ejecutando:${RESET} ${YELLOW}manager-ssh${RESET}"
-echo -e "$SEPARADOR"
+    echo -e "$SEPARADOR"
+    echo -e "${GREEN}✅ Servicio construido correctamente.${RESET}"
+    echo -e "$SEPARADOR"
+    pausa_menu
+}
+
+function editar_servicio() {
+    echo -e "$SEPARADOR"
+    echo -e "${CYAN}✏️ Editando un servicio...${RESET}"
+
+    descargar_limpio "https://raw.githubusercontent.com/ChristopherAGT/sshws-gcp-config/main/edit-service-ssh.sh" "edit-service-ssh.sh"
+    if [[ $? -ne 0 ]]; then
+        pausa_menu
+        return 1
+    fi
+
+    bash edit-service-ssh.sh
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}❌ Error al ejecutar el script de edición.${RESET}"
+        pausa_menu
+        return 1
+    fi
+
+    echo -e "$SEPARADOR"
+    echo -e "${GREEN}✅ Servicio editado correctamente.${RESET}"
+    echo -e "$SEPARADOR"
+    pausa_menu
+}
+
+function remover_servicio() {
+    echo -e "$SEPARADOR"
+    echo -e "${RED}🧹 Removiendo un servicio...${RESET}"
+
+    descargar_limpio "https://raw.githubusercontent.com/ChristopherAGT/sshws-gcp-config/main/remove-service-ssh.sh" "remove-service-ssh.sh"
+    if [[ $? -ne 0 ]]; then
+        pausa_menu
+        return 1
+    fi
+
+    bash remove-service-ssh.sh
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}❌ Error al ejecutar el script de eliminación.${RESET}"
+        pausa_menu
+        return 1
+    fi
+
+    echo -e "$SEPARADOR"
+    echo -e "${GREEN}✅ Servicio removido correctamente.${RESET}"
+    echo -e "$SEPARADOR"
+    pausa_menu
+}
+
+function mostrar_menu() {
+    while true; do
+        clear
+        echo -e "$SEPARADOR"
+        echo -e "${CYAN}    🚀 PANEL DE CONTROL SSH-WS${RESET}"
+        echo -e "$SEPARADOR"
+        echo -e "${YELLOW}1️⃣  Construir Servicio${RESET}"
+        echo -e "${YELLOW}2️⃣  Editar Servicio${RESET}"
+        echo -e "${YELLOW}3️⃣  Remover Servicio${RESET}"
+        echo -e "${YELLOW}4️⃣  Salir${RESET}"
+        echo -e "$SEPARADOR"
+        echo -ne "${YELLOW}👉 Seleccione una opción [1-4]: ${RESET}"
+
+        read -r opcion
+
+        case $opcion in
+            [1-4])
+                case $opcion in
+                    1) construir_servicio ;;
+                    2) editar_servicio ;;
+                    3) remover_servicio ;;
+                    4)
+                        echo -e "$SEPARADOR"
+                        echo -e "${YELLOW}👋 Saliendo...${RESET}"
+                        echo -e "$SEPARADOR"
+                        echo -e "${BLUE}👾 Créditos a Leo Duarte${RESET}"
+                        sleep 1
+                        exit 0
+                        ;;
+                esac
+                ;;
+            *)
+                echo -e "${RED}⚠️  Opción inválida. Inténtalo de nuevo.${RESET}"
+                sleep 2
+                ;;
+        esac
+    done
+}
+
+# Iniciar menú
+mostrar_menu
