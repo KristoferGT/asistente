@@ -1,140 +1,138 @@
 #!/bin/bash
 
-# ┌─────────────────────────────────────────────────────────────┐
-# │ Instalación silenciosa como comando global 'aws-manager'   │
-# └─────────────────────────────────────────────────────────────┘
-if [[ "$0" != */aws-manager ]]; then
-    SCRIPT_PATH="$HOME/.aws-manager.sh"
-    curl -s https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/manager-distribution.sh -o "$SCRIPT_PATH"
-    chmod +x "$SCRIPT_PATH"
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$SCRIPT_PATH" "$HOME/.local/bin/aws-manager"
-    export PATH="$HOME/.local/bin:$PATH"
-fi
-
-clear
-
 # ╔══════════════════════════════════════════════════════════╗
-# ║            🛠️ AWS CLOUDFRONT MANAGER - PANEL                       ║
+# ║            🔥 FIREWALLD - APERTURA DE PUERTOS TCP/UDP              ║
+# ║            👾 Autor: ChristopherAGT - Guatemalteco 🇬🇹              ║
 # ╚══════════════════════════════════════════════════════════╝
 
-# Colores
-RED='\e[1;91m'
-GREEN='\e[1;92m'
-YELLOW='\e[1;93m'
-BLUE='\e[1;94m'
-MAGENTA='\e[1;95m'
-CYAN='\e[1;96m'
-BOLD='\e[1m'
-RESET='\e[0m'
+# 🛑 Requiere permisos de superusuario
+if [ "$EUID" -ne 0 ]; then
+  echo -e "\n\033[1;31m🚫 Este script debe ejecutarse como root o con sudo.\033[0m"
+  exit 1
+fi
 
-divider() {
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+# 🎨 Colores
+verde="\033[1;32m"
+rojo="\033[1;31m"
+azul="\033[1;34m"
+amarillo="\033[1;33m"
+neutro="\033[0m"
+
+# 🔄 Spinner animado
+spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinstr='|/-\'
+  tput civis
+  while ps -p $pid &>/dev/null; do
+    local temp=${spinstr#?}
+    printf " [%c]  " "$spinstr"
+    spinstr=$temp${spinstr%"$temp"}
+    sleep $delay
+    printf "\b\b\b\b\b\b"
+  done
+  tput cnorm
 }
 
-menu_header() {
-    echo -e "${CYAN}"
-    echo "╔════════════════════════════════════════════╗"
-    echo "║        🛠️ AWS CLOUDFRONT MANAGER - PANEL           ║"
-    echo "╚════════════════════════════════════════════╝"
-    divider
-}
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${azul}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔄  ACTUALIZANDO LISTA DE PAQUETES DEL SISTEMA"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
 
-menu() {
-    clear
-    menu_header
-    echo -e "${BOLD}${CYAN}🌐 ¿Qué deseas hacer hoy?${RESET}"
-    divider
-    echo -e "${YELLOW}1.${RESET} 🆕 Crear distribución"
-    echo -e "${YELLOW}2.${RESET} 📊 Ver estado de distribuciones"
-    echo -e "${YELLOW}3.${RESET} ⚙️ Editar distribución"
-    echo -e "${YELLOW}4.${RESET} 🔁 Activar/Desactivar distribución"
-    echo -e "${YELLOW}5.${RESET} 🗑️ Eliminar distribución"
-    echo -e "${YELLOW}6.${RESET} 🔐 Crear certificado SSL"
-    echo -e "${YELLOW}7.${RESET} 🧹 Remover el panel"
-    echo -e "${YELLOW}8.${RESET} 🚪 Salir"
-    divider
-}
+apt-get update -y &> /dev/null &
+spinner $!
+echo -e "${verde}✔ Lista de paquetes actualizada.${neutro}"
 
-pause() {
-    read -rp $'\n\e[1;93m👉 Presiona ENTER para volver al menú... \e[0m'
-}
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${azul}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📦  VERIFICANDO INSTALACIÓN DE FIREWALLD"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
 
-# Función genérica para ejecutar scripts
-ejecutar_script() {
-    local url="$1"
-    local archivo="$2"
-    local mostrar_exito="$3"
+if ! command -v firewall-cmd &> /dev/null; then
+  echo -e "${amarillo}📦 firewalld no está instalado. Instalando...${neutro}"
+  apt-get install -y firewalld &> /dev/null &
+  spinner $!
+  if ! command -v firewall-cmd &> /dev/null; then
+    echo -e "${rojo}❌ La instalación de firewalld falló. Abortando.${neutro}"
+    exit 1
+  fi
+  echo -e "${verde}✔ firewalld instalado correctamente.${neutro}"
+else
+  echo -e "${verde}✔ firewalld ya está instalado.${neutro}"
+fi
 
-    if wget -q "$url" -O "$archivo"; then
-        bash "$archivo"
-        local RET=$?
-        rm -f "$archivo"
-        if [ "$RET" -eq 0 ] && [ "$mostrar_exito" = true ]; then
-            echo -e "${GREEN}✅ Script ejecutado correctamente.${RESET}"
-        elif [ "$RET" -ne 0 ]; then
-            echo -e "${RED}❌ El script terminó con errores (Código $RET).${RESET}"
-        fi
-    else
-        echo -e "${RED}❌ No se pudo descargar el script: $archivo.${RESET}"
-    fi
-}
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${azul}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀  INICIANDO Y HABILITANDO FIREWALLD"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
 
-remover_panel() {
-    echo -e "${YELLOW}🧹 Removiendo archivos instalados...${RESET}"
-    rm -f "$HOME/.aws-manager.sh"
-    rm -f "$HOME/.local/bin/aws-manager"
-    echo -e "${GREEN}✅ Archivos eliminados correctamente.${RESET}"
-}
+systemctl enable firewalld &> /dev/null
+systemctl start firewalld
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${amarillo}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "⚠️  ¡ATENCIÓN! APERTURA TOTAL DE PUERTOS"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
+echo -e "🔐 Estás a punto de abrir *TODOS* los puertos TCP y UDP (1-65535).\n"
 while true; do
-    menu
-    read -rp $'\e[1;93m🔢 Ingrese opción (1-8): \e[0m' opcion
-
-    case "$opcion" in
-        1)
-            echo -e "${BLUE}🚀 Ejecutando: Crear distribución...${RESET}"
-            ejecutar_script "https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/create-distribution.sh" "create-distribution.sh" true
-            pause
-            ;;
-        2)
-            echo -e "${BLUE}📈 Ejecutando: Ver estado de distribuciones...${RESET}"
-            ejecutar_script "https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/status-distribution.sh" "status-distribution.sh" false
-            pause
-            ;;
-        3)
-            echo -e "${BLUE}🛠️ Ejecutando: Editar distribución...${RESET}"
-            ejecutar_script "https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/edit-distribution.sh" "edit-distribution.sh" true
-            pause
-            ;;
-        4)
-            echo -e "${BLUE}🔄 Ejecutando: Activar/Desactivar distribución...${RESET}"
-            ejecutar_script "https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/control-status-distribution.sh" "control-status-distribution.sh" true
-            pause
-            ;;
-        5)
-            echo -e "${BLUE}🗑️ Ejecutando: Eliminar distribución...${RESET}"
-            ejecutar_script "https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/delete-distribution.sh" "delete-distribution.sh" true
-            pause
-            ;;
-        6)
-            echo -e "${BLUE}🔐 Ejecutando: Crear certificado SSL...${RESET}"
-            ejecutar_script "https://raw.githubusercontent.com/ChristopherAGT/aws-cloudfront/main/create-certificate.sh" "create-certificate.sh" true
-            pause
-            ;;
-        7)
-            remover_panel
-            pause
-            ;;
-        8)
-            echo -e "${MAGENTA}👋 Saliendo del panel...${RESET}"
-            echo -e "${CYAN}💡 Puedes ejecutar nuevamente el panel con el comando: ${BOLD}aws-manager${RESET}"
-            echo -e "${GREEN}📝 Créditos a 👾 Christopher Ackerman${RESET}"
-            exit 0
-            ;;
-        *)
-            echo -e "${RED}❌ Opción inválida. Por favor ingresa un número entre 1 y 8.${RESET}"
-            pause
-            ;;
-    esac
+  read -p "¿Deseas continuar? [s/n]: " confirm
+  case "$confirm" in
+    [sS]) break ;;  # Continua el script
+    [nN]|"") echo -e "${rojo}❌ Operación cancelada por el usuario.${neutro}"; exit 1 ;;
+    *) echo -e "${amarillo}⚠️ Respuesta no válida. Ingresa 's' para sí o 'n' para no.${neutro}" ;;
+  esac
 done
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${azul}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔍  VERIFICANDO PUERTOS ACTUALMENTE ABIERTOS"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
+
+if firewall-cmd --zone=public --list-ports | grep -q "1-65535/tcp"; then
+  echo -e "${amarillo}⚠️ Los puertos TCP ya están abiertos.${neutro}"
+else
+  echo -e "${amarillo}🔓 Abriendo puertos TCP...${neutro}"
+  firewall-cmd --zone=public --permanent --add-port=1-65535/tcp
+fi
+
+if firewall-cmd --zone=public --list-ports | grep -q "1-65535/udp"; then
+  echo -e "${amarillo}⚠️ Los puertos UDP ya están abiertos.${neutro}"
+else
+  echo -e "${amarillo}🔓 Abriendo puertos UDP...${neutro}"
+  firewall-cmd --zone=public --permanent --add-port=1-65535/udp
+fi
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${azul}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "♻️  REINICIANDO CONFIGURACIÓN FIREWALLD"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
+
+firewall-cmd --reload
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${verde}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📋  PUERTOS ABIERTOS EN ZONA 'public'"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${neutro}"
+
+firewall-cmd --zone=public --list-ports
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+echo -e "${verde}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅  CONFIGURACIÓN COMPLETADA CON ÉXITO"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${amarillo}⚠️ Recuerda: abrir todos los puertos es riesgoso. Úsalo sólo en entornos seguros.${neutro}\n"
