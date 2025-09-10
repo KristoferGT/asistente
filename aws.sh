@@ -129,7 +129,7 @@ while true; do
         8)
             echo -e "${MAGENTA}👋 Saliendo del panel...${RESET}"
             echo -e "${CYAN}💡 Puedes ejecutar nuevamente el panel con el comando: ${BOLD}aws-manager${RESET}"
-            echo -e "${GREEN}📝 Créditos a 👾 Christopher Ackerman${RESET}"
+            echo -e "${GREEN}📝 Créditos a 👾 Leo Duarte${RESET}"
             exit 0
             ;;
         *)
